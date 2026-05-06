@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Alumnos – ET N° 20</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #f0f2f5;
+            color: #333;
+            padding: 20px;
+        }
+        h1 { color: #2c3e50; margin-bottom: 20px; }
+        h2 { color: #34495e; margin: 20px 0 10px; }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+
+        input {
+            padding: 8px 12px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .btn-primary { background: #3498db; color: white; }
+        .btn-success { background: #2ecc71; color: white; }
+        .btn-danger  { background: #e74c3c; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th {
+            background: #2c3e50;
+            color: white;
+            padding: 10px;
+            text-align: left;
+        }
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        tr:hover { background: #f9f9f9; }
+
+        #mensaje {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            display: none;
+        }
+        .exito { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error  { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+
+<h1>🎓 Gestión de Alumnos – ET N° 20</h1>
+
+<!-- LOGIN -->
+<div class="card">
+    <h2>🔐 Iniciar sesión</h2>
+    <input type="text"     id="loginUser" placeholder="Usuario" value="admin">
+    <input type="password" id="loginPass" placeholder="Contraseña" value="1234">
+    <button class="btn-primary" onclick="login()">Ingresar</button>
+    <span id="estadoLogin" style="margin-left:10px; font-size:13px;"></span>
+</div>
+
+<!-- FORMULARIO AGREGAR ALUMNO -->
+<div class="card">
+    <h2>➕ Agregar nuevo alumno</h2>
+    <input type="text"   id="nombre" placeholder="Nombre completo">
+    <input type="text"   id="dni"    placeholder="DNI (7 u 8 dígitos)">
+    <input type="number" id="anio"   placeholder="Año (1-7)" min="1" max="7">
+    <input type="email"  id="email"  placeholder="Email">
+    <button class="btn-success" onclick="agregarAlumno()">Guardar</button>
+
+    <div id="mensaje"></div>
+</div>
+
+<!-- LISTA DE ALUMNOS -->
+<div class="card">
+    <h2>📋 Lista de alumnos</h2>
+    <button class="btn-primary" onclick="cargarAlumnos()">🔄 Actualizar lista</button>
+    <table id="tablaAlumnos">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>DNI</th>
+                <th>Año</th>
+                <th>Email</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="cuerpoTabla">
+            <tr><td colspan="6" style="text-align:center">
+                Hacé clic en "Actualizar lista" para cargar los alumnos
+            </td></tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    const API = 'http://localhost:8080/api';
+    let token = '';
+
+    // LOGIN – obtiene el token JWT
+    async function login() {
+        const username = document.getElementById('loginUser').value;
+        const password = document.getElementById('loginPass').value;
+
+        try {
+            const res = await fetch(`${API}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                token = data.token;
+                document.getElementById('estadoLogin').textContent =
+                    '✅ Sesión iniciada correctamente';
+                document.getElementById('estadoLogin').style.color = 'green';
+                cargarAlumnos();
+            } else {
+                document.getElementById('estadoLogin').textContent =
+                    '❌ ' + (data.error || 'Error al iniciar sesión');
+                document.getElementById('estadoLogin').style.color = 'red';
+            }
+        } catch (err) {
+            document.getElementById('estadoLogin').textContent =
+                '❌ No se pudo conectar con el servidor';
+            document.getElementById('estadoLogin').style.color = 'red';
+        }
+    }
+
+    // GET /api/alumnos – carga y muestra la tabla
+    async function cargarAlumnos() {
+        if (!token) {
+            mostrarMensaje('Primero iniciá sesión.', false);
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API}/alumnos`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!res.ok) {
+                mostrarMensaje('Error al cargar alumnos: ' + res.status, false);
+                return;
+            }
+
+            const alumnos = await res.json();
+            const tbody = document.getElementById('cuerpoTabla');
+
+            if (alumnos.length === 0) {
+                tbody.innerHTML =
+                    '<tr><td colspan="6" style="text-align:center">No hay alumnos registrados</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = alumnos.map(a => `
+                <tr>
+                    <td>${a.id}</td>
+                    <td>${a.nombre}</td>
+                    <td>${a.dni}</td>
+                    <td>${a.anio}°</td>
+                    <td>${a.email || '—'}</td>
+                    <td>
+                        <button class="btn-danger"
+                            onclick="eliminarAlumno(${a.id}, '${a.nombre}')">
+                            🗑 Eliminar
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+        } catch (err) {
+            mostrarMensaje('Error de conexión: ' + err.message, false);
+        }
+    }
+
+    // POST /api/alumnos – agrega un alumno
+    async function agregarAlumno() {
+        if (!token) {
+            mostrarMensaje('Primero iniciá sesión.', false);
+            return;
+        }
+
+        const alumno = {
+            nombre: document.getElementById('nombre').value,
+            dni:    document.getElementById('dni').value,
+            anio:   parseInt(document.getElementById('anio').value),
+            email:  document.getElementById('email').value
+        };
+
+        try {
+            const res = await fetch(`${API}/alumnos`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(alumno)
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                mostrarMensaje(
+                    `✅ Alumno "${data.nombre}" creado con ID ${data.id}`, true);
+                // Limpiar formulario
+                ['nombre','dni','anio','email'].forEach(id =>
+                    document.getElementById(id).value = '');
+                cargarAlumnos();
+            } else {
+                const errores = data.campos
+                    ? Object.values(data.campos).join(', ')
+                    : (data.mensaje || 'Error al crear alumno');
+                mostrarMensaje('❌ ' + errores, false);
+            }
+        } catch (err) {
+            mostrarMensaje('Error de conexión: ' + err.message, false);
+        }
+    }
+
+    // DELETE /api/alumnos/{id}
+    async function eliminarAlumno(id, nombre) {
+        if (!confirm(`¿Seguro que querés eliminar a ${nombre}?`)) return;
+
+        try {
+            const res = await fetch(`${API}/alumnos/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (res.status === 204) {
+                mostrarMensaje(`✅ Alumno "${nombre}" eliminado.`, true);
+                cargarAlumnos();
+            } else {
+                const data = await res.json();
+                mostrarMensaje('❌ ' + (data.mensaje || 'Error al eliminar'), false);
+            }
+        } catch (err) {
+            mostrarMensaje('Error de conexión: ' + err.message, false);
+        }
+    }
+
+    // Muestra un mensaje de éxito o error
+    function mostrarMensaje(texto, esExito) {
+        const el = document.getElementById('mensaje');
+        el.textContent = texto;
+        el.className = esExito ? 'exito' : 'error';
+        el.style.display = 'block';
+        setTimeout(() => el.style.display = 'none', 4000);
+    }
+</script>
+</body>
+</html>

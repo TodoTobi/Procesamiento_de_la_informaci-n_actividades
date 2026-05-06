@@ -1,0 +1,13 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Run Alumnos API",
+            "request": "launch",
+            "mainClass": "com.et20.alumnos.AlumnosApiApplication",
+            "projectName": "alumnos-api",
+            "cwd": "${workspaceFolder}/alumnos-api"
+        }
+    ]
+}
